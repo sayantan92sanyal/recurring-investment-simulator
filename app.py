@@ -40,6 +40,12 @@ ACCENT = BETTER
 MUTED = "#8a93b5"
 GRID = "rgba(255,255,255,0.07)"
 
+# Phones get compact charts: the server can't see screen width, but the user agent says "Mobile".
+_ua = st.context.headers.get("User-Agent", "")
+MOBILE = "Mobi" in _ua or "Android" in _ua
+# On touch screens the toolbar covers the chart and dragging should scroll the page, not zoom.
+PLOT_CONFIG = {"displayModeBar": False, "scrollZoom": False} if MOBILE else {"displaylogo": False}
+
 
 # ---------------------------------------------------------------- cached computation
 @st.cache_data(show_spinner=False, ttl="6h")  # expires so a failed live download is retried later
@@ -81,6 +87,11 @@ def style_fig(fig: go.Figure, height: int = 380) -> go.Figure:
     )
     fig.update_xaxes(gridcolor=GRID, zeroline=False)
     fig.update_yaxes(gridcolor=GRID, zeroline=False)
+    if MOBILE:
+        # Axis titles repeat the card heading; drop them to give the plot the width.
+        fig.update_layout(dragmode=False, font=dict(size=11), margin=dict(l=4, r=4, t=6, b=6))
+        fig.update_xaxes(title=None, fixedrange=True)
+        fig.update_yaxes(title=None, fixedrange=True)
     return fig
 
 
@@ -108,9 +119,10 @@ def frequency_strip(values: pd.Series, hover: pd.Series, y_title: str) -> go.Fig
         labels = [c.label for c in CONFIGS if c.group == group]
         fig.add_trace(
             go.Box(
-                y=[values[l] for l in labels], name=group, boxpoints="all", jitter=0.45, pointpos=0,
+                y=[values[l] for l in labels], name=group.replace(" (", "<br>(") if MOBILE else group,
+                boxpoints="all", jitter=0.45, pointpos=0,
                 fillcolor="rgba(0,0,0,0)", line=dict(color="rgba(0,0,0,0)"),
-                marker=dict(color=ACCENT, size=9),
+                marker=dict(color=ACCENT, size=7 if MOBILE else 9),
                 customdata=[[l, hover[l]] for l in labels],
                 hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}<extra></extra>",
                 showlegend=False,
@@ -126,7 +138,9 @@ def weekday_heatmap(values: pd.Series, text: pd.Series) -> go.Figure:
     g = goodness(values)
     z = [[g[fn(w)] for w in range(5)] for _, fn in GRID_ROWS]
     txt = [[text[fn(w)] for w in range(5)] for _, fn in GRID_ROWS]
-    hover = [[fn(w) for w in range(5)] for _, fn in GRID_ROWS]
+    hover = [[f"<b>{fn(w)}</b><br>{text[fn(w)]}" for w in range(5)] for _, fn in GRID_ROWS]
+    if MOBILE:  # one line per cell fits a phone; the full text is in the tap label
+        txt = [[t.split("<br>")[0] for t in row] for row in txt]
     fig = go.Figure(
         go.Heatmap(
             z=z,
@@ -135,8 +149,8 @@ def weekday_heatmap(values: pd.Series, text: pd.Series) -> go.Figure:
             text=txt,
             customdata=hover,
             texttemplate="%{text}",
-            textfont=dict(size=13),
-            hovertemplate="<b>%{customdata}</b><br>%{text}<extra></extra>",
+            textfont=dict(size=10 if MOBILE else 13),
+            hovertemplate="%{customdata}<extra></extra>",
             colorscale=DIVERGING,
             zmin=-1,
             zmax=1,
@@ -146,11 +160,12 @@ def weekday_heatmap(values: pd.Series, text: pd.Series) -> go.Figure:
                 tickvals=[-1, 0, 1], ticktext=["Worse", "Typical", "Better"],
                 thickness=12, len=0.9, outlinewidth=0, tickfont=dict(size=12),
             ),
+            showscale=not MOBILE,  # the card text explains the colours; phones need the width
         )
     )
-    fig.update_yaxes(autorange="reversed", tickfont=dict(size=13))
-    fig.update_xaxes(side="top", tickfont=dict(size=13))
-    return style_fig(fig, 560)
+    fig.update_yaxes(autorange="reversed", tickfont=dict(size=10 if MOBILE else 13))
+    fig.update_xaxes(side="top", tickfont=dict(size=11 if MOBILE else 13), tickangle=0)
+    return style_fig(fig, 460 if MOBILE else 560)
 
 
 def dom_dots(values: pd.Series, hover: pd.Series, y_title: str, reference: float) -> go.Figure:
@@ -164,7 +179,7 @@ def dom_dots(values: pd.Series, hover: pd.Series, y_title: str, reference: float
             x=days,
             y=[values[l] for l in labels],
             mode="markers",
-            marker=dict(size=11, color=[g[l] for l in labels], colorscale=DIVERGING, cmin=-1, cmax=1,
+            marker=dict(size=8 if MOBILE else 11, color=[g[l] for l in labels], colorscale=DIVERGING, cmin=-1, cmax=1,
                         line=dict(width=1, color=MUTED)),
             customdata=[hover[l] for l in labels],
             hovertemplate="<b>Day %{x}</b><br>%{customdata}<extra></extra>",
@@ -173,9 +188,9 @@ def dom_dots(values: pd.Series, hover: pd.Series, y_title: str, reference: float
     )
     fig.add_hline(y=reference, line_dash="dot", line_color=MUTED,
                   annotation_text="Daily", annotation_position="top right")
-    fig.update_xaxes(title="Day of month", dtick=1)
+    fig.update_xaxes(title="Day of month", dtick=3 if MOBILE else 1, tick0=1, range=[0.3, 28.7], tickangle=0)
     fig.update_yaxes(title=y_title, ticksuffix="%")
-    return style_fig(fig, 380)
+    return style_fig(fig, 340 if MOBILE else 380)
 
 
 def line_chart(series: dict, y_title: str, zero_line: bool = False) -> go.Figure:
@@ -190,9 +205,12 @@ def line_chart(series: dict, y_title: str, zero_line: bool = False) -> go.Figure
         )
     if zero_line:
         fig.add_hline(y=0, line_color=MUTED, line_dash="dot")
-    fig.update_layout(hovermode="x unified", legend=dict(orientation="h", y=1.08, x=0))
+    legend = dict(orientation="h", y=-0.12, yanchor="top", x=0) if MOBILE else dict(orientation="h", y=1.08, x=0)
+    fig.update_layout(hovermode="x unified", legend=legend)
     fig.update_yaxes(title=y_title)
-    return style_fig(fig, 420)
+    if MOBILE:  # the axis title is hidden on phones, so put the unit on the numbers
+        fig.update_yaxes(ticksuffix="%" if "(%)" in y_title else " pp")
+    return style_fig(fig, 380 if MOBILE else 420)
 
 
 def featured(labels_in_order) -> list:
@@ -328,7 +346,7 @@ with tab_single:
             "Higher is better. A tight cluster means the day you pick within that frequency barely matters; "
             "a wide spread means it does. Hover over a dot to see which schedule it is.",
         )
-        card.plotly_chart(frequency_strip(ret, hover_text, "Total return (%)"), key="s_strip")
+        card.plotly_chart(frequency_strip(ret, hover_text, "Total return (%)"), key="s_strip", config=PLOT_CONFIG)
 
         card = section(
             2, "Total return by frequency and weekday",
@@ -339,7 +357,7 @@ with tab_single:
             "alternating sets of weeks. *Monthly 2nd* + *Tue* means the 2nd Tuesday of every month.",
             colors=HEAT_COLORS,
         )
-        card.plotly_chart(weekday_heatmap(ret, cell_text), key="s_heat")
+        card.plotly_chart(weekday_heatmap(ret, cell_text), key="s_heat", config=PLOT_CONFIG)
 
         card = section(
             3, "Monthly on a fixed date: total return",
@@ -348,7 +366,7 @@ with tab_single:
             "Each dot is one date; higher is better. Colours match the grid above. "
             "The dotted line marks Daily for reference.",
         )
-        card.plotly_chart(dom_dots(ret, hover_text, "Total return (%)", ret["Daily"]), key="s_dom")
+        card.plotly_chart(dom_dots(ret, hover_text, "Total return (%)", ret["Daily"]), key="s_dom", config=PLOT_CONFIG)
 
         best_weekly = lb[lb["group"] == "Weekly"].iloc[0]["config"]
         show = featured([best["config"], "Daily", best_weekly, worst["config"]])
@@ -364,7 +382,7 @@ with tab_single:
             "Lines close together mean the schedule made little difference; the gap at the right edge is the "
             "final difference. Early on the lines jump around because little money is invested yet.",
         )
-        card.plotly_chart(line_chart(curves, "Total return (%)"), key="s_line")
+        card.plotly_chart(line_chart(curves, "Total return (%)"), key="s_line", config=PLOT_CONFIG)
 
         with st.expander(f"Full results table ({len(lb)} schedules)"):
             st.dataframe(
@@ -426,7 +444,7 @@ with tab_roll:
             "Higher is better. A tight cluster means the day you pick within that frequency barely matters. "
             "Hover over a dot to see the schedule and how often it finished in the top 10%.",
         )
-        card.plotly_chart(frequency_strip(med, hover_text, "Median total return (%)"), key="r_strip")
+        card.plotly_chart(frequency_strip(med, hover_text, "Median total return (%)"), key="r_strip", config=PLOT_CONFIG)
 
         card = section(
             2, "Median total return by frequency and weekday",
@@ -435,14 +453,14 @@ with tab_roll:
             "blue here was reliably good, not just lucky once.",
             colors=HEAT_COLORS,
         )
-        card.plotly_chart(weekday_heatmap(med, cell_text), key="r_heat")
+        card.plotly_chart(weekday_heatmap(med, cell_text), key="r_heat", config=PLOT_CONFIG)
 
         card = section(
             3, "Monthly on a fixed date: median total return",
             "The 28 calendar-date schedules, each as its median return across all windows.",
             "Higher is better; colours match the grid. The dotted line marks Daily.",
         )
-        card.plotly_chart(dom_dots(med, hover_text, "Median total return (%)", med["Daily"]), key="r_dom")
+        card.plotly_chart(dom_dots(med, hover_text, "Median total return (%)", med["Daily"]), key="r_dom", config=PLOT_CONFIG)
 
         best_weekly = summary[summary["group"] == "Weekly"].iloc[0]["config"]
         show = featured([top["config"], best_weekly, bottom["config"]])
@@ -457,7 +475,7 @@ with tab_roll:
             "Above the dotted zero line = beat Daily in that window; below = trailed it. A line that stays above "
             "zero is a consistent edge; one that crosses back and forth is mostly luck.",
         )
-        card.plotly_chart(line_chart(gaps, "vs Daily (pp)", zero_line=True), key="r_line")
+        card.plotly_chart(line_chart(gaps, "vs Daily (pp)", zero_line=True), key="r_line", config=PLOT_CONFIG)
 
         with st.expander("Rolling summary table"):
             st.dataframe(
@@ -581,11 +599,11 @@ with tab_port:
                 fig.add_trace(go.Box(
                     y=lb["return_pct"], name=t, boxpoints="all", jitter=0.45, pointpos=0,
                     fillcolor="rgba(0,0,0,0)", line=dict(color="rgba(0,0,0,0)"),
-                    marker=dict(color=ACCENT, size=9), customdata=lb[["config"]].values,
+                    marker=dict(color=ACCENT, size=7 if MOBILE else 9), customdata=lb[["config"]].values,
                     hovertemplate="<b>%{customdata[0]}</b><br>%{y:.2f}%<extra></extra>", showlegend=False,
                 ))
             fig.update_yaxes(title="Total return (%)", ticksuffix="%")
-            card.plotly_chart(style_fig(fig, 400), key="p_strip")
+            card.plotly_chart(style_fig(fig, 400), key="p_strip", config=PLOT_CONFIG)
 
             if len(results) > 1:
                 ptext = combined.apply(lambda r: f"{r['return_pct']:.2f}%<br>{money(r['final_value'])}", axis=1)
@@ -597,7 +615,7 @@ with tab_port:
                     "schedule for everything.",
                     colors=HEAT_COLORS,
                 )
-                card.plotly_chart(weekday_heatmap(combined["return_pct"], ptext), key="p_heat")
+                card.plotly_chart(weekday_heatmap(combined["return_pct"], ptext), key="p_heat", config=PLOT_CONFIG)
 
 # ---------------------------------------------------------------- read me
 with tab_readme:
