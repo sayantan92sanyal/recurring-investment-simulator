@@ -61,6 +61,11 @@ On Windows, use `.venv\Scripts\pip` and `.venv\Scripts\streamlit` instead.
 The first time you look up a ticker, its prices are downloaded from Yahoo Finance and saved in the `data/`
 folder. After that, the app loads them from disk, so the same inputs always give the same results.
 
+Yahoo Finance sometimes refuses downloads, especially from shared cloud servers. The app retries a
+couple of times, and if Yahoo still refuses, it falls back to saved prices shipped in the `seed/` folder
+(AAPL, ARKK, GLD, GOOG, MSFT, NVDA, PWB, QQQ, SCHD, SOXL, SOXX, VOO, VTI). When it is using saved prices
+that are more than a week old, the app says so.
+
 ---
 
 ## A tour of the app
@@ -313,11 +318,12 @@ Dates stop at the 28th because every month has one.
 | `app.py` | Streamlit UI |
 | `ui.py` | Visual layer: custom CSS, hero banner, section cards |
 | `.streamlit/config.toml` | Theme: dark palette, fonts (Inter, Space Grotesk), corner radius |
-| `data.py` | Downloads prices via yfinance and caches them in `data/` |
+| `data.py` | Downloads prices via yfinance and caches them in `data/`; falls back to `seed/` |
+| `seed/` | Saved prices for popular tickers, used when Yahoo Finance can't be reached |
 | `schedule.py` | Turns a schedule (e.g. "bi-weekly Tue, week A") into buy dates |
 | `simulate.py` | Single-period runs, value-over-time curves, rolling windows |
 | `metrics.py` | Annualised money-weighted return (XIRR) |
-| `tests/` | Engine tests on small hand-checked price series: `.venv/bin/python -m pytest tests` |
+| `tests/` | Engine tests on small hand-checked price series, plus price-loading tests: `.venv/bin/python -m pytest tests` |
 | `docs/screenshots/` | The images used in this README |
 
 ---

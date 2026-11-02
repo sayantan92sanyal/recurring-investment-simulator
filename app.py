@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from data import load_prices
+from data import load_prices, saved_tickers
 from schedule import GROUPS, ORDINALS, WEEKDAYS, all_configs, config_by_label
 from simulate import (
     build_buys,
@@ -42,7 +42,7 @@ GRID = "rgba(255,255,255,0.07)"
 
 
 # ---------------------------------------------------------------- cached computation
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl="6h")  # expires so a failed live download is retried later
 def cached_prices(ticker: str, refresh_token: int) -> pd.DataFrame:
     return load_prices(ticker, refresh=refresh_token > 0)
 
@@ -211,7 +211,9 @@ with st.sidebar:
     st.markdown('<div class="side-brand">Recurring Investment Simulator</div>', unsafe_allow_html=True)
     st.header("Inputs")
     ticker = st.text_input(
-        "Ticker", "VOO", help="Any symbol on Yahoo Finance: stocks, ETFs, mutual funds (e.g. AAPL, VTI, QQQ)."
+        "Ticker", "VOO",
+        help="Any symbol on Yahoo Finance: stocks, ETFs, mutual funds. "
+             f"Saved prices are always available for {', '.join(saved_tickers())}.",
     ).strip().upper()
     budget = st.number_input("Monthly budget ($)", min_value=1.0, value=1000.0, step=50.0)
     # Fixed month list (not derived from the ticker) so the selection survives ticker changes.
@@ -257,6 +259,10 @@ except Exception as e:  # noqa: BLE001 - surface any download problem to the use
     st.stop()
 
 months = complete_months(prices)
+last_day = prices.index[-1]
+if last_day < pd.Timestamp.today().normalize() - pd.Timedelta(days=7):
+    st.info(f"Using saved prices for {ticker}, which end on {last_day.strftime('%d %b %Y')}. "
+            "Click **Re-download price data** in the sidebar to try fetching the latest.")
 if len(months) < 2:
     st.error(f"{ticker} does not have enough price history yet.")
     st.stop()
