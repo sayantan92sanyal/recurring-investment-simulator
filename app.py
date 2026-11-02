@@ -39,6 +39,8 @@ HEAT_COLORS = {"Blue": BETTER, "red": WORSE, "grey": MIDDLE}
 ACCENT = BETTER
 MUTED = "#8a93b5"
 GRID = "rgba(255,255,255,0.07)"
+CREDIT = ("Sayantan Sanyal · [sayantan92sanyal@gmail.com](mailto:sayantan92sanyal@gmail.com) · "
+          "[GitHub](https://github.com/sayantan92sanyal/recurring-investment-simulator)")
 
 # Phones get compact charts: the server can't see screen width, but the user agent says "Mobile".
 _ua = st.context.headers.get("User-Agent", "")
@@ -255,6 +257,7 @@ with st.sidebar:
     if st.button("Re-download price data"):
         st.session_state.refresh += 1
         st.cache_data.clear()
+    st.caption(f"Created by {CREDIT}")
 
 hero(
     "Backtest your auto-invest",
@@ -687,3 +690,4 @@ st.caption(
     "Data: Yahoo Finance via yfinance, cached locally. Simulations are deterministic replays of history and "
     "ignore taxes, bid/ask spreads and order timing within the day. Not financial advice."
 )
+st.caption(f"Created by {CREDIT}")

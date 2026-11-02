@@ -2,6 +2,9 @@
 
 **How often, and on which day, should a recurring investment buy?**
 
+Created by **Sayantan Sanyal** · [sayantan92sanyal@gmail.com](mailto:sayantan92sanyal@gmail.com) ·
+[GitHub](https://github.com/sayantan92sanyal)
+
 Say you invest $1,000 every month in an index fund. You still have to decide *how* that money goes in:
 all at once on the 1st? $250 every Monday? A little every trading day? Every two weeks on a Friday?
 
@@ -327,6 +330,12 @@ Dates stop at the 28th because every month has one.
 | `docs/screenshots/` | The images used in this README |
 
 ---
+
+## Author
+
+Created by **Sayantan Sanyal**. Questions, ideas or bug reports are welcome: email
+[sayantan92sanyal@gmail.com](mailto:sayantan92sanyal@gmail.com) or
+[open an issue](https://github.com/sayantan92sanyal/recurring-investment-simulator/issues).
 
 ## Disclaimer
 
