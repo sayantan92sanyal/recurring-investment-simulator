@@ -337,6 +337,11 @@ Created by **Sayantan Sanyal**. Questions, ideas or bug reports are welcome: ema
 [sayantan92sanyal@gmail.com](mailto:sayantan92sanyal@gmail.com) or
 [open an issue](https://github.com/sayantan92sanyal/recurring-investment-simulator/issues).
 
+## License
+
+[MIT](LICENSE) © 2026 Sayantan Sanyal. You are free to use, copy, modify and share this code, including
+commercially, as long as the copyright and license notice stay with it.
+
 ## Disclaimer
 
 For education and research only. This is not financial advice, and past performance does not guarantee
